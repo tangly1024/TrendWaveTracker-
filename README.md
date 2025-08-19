@@ -78,6 +78,7 @@
 
 ## 📈 可视化效果
 <img width="1452" height="597" alt="image" src="https://github.com/user-attachments/assets/dbacb1d5-3409-4c7d-b481-5ea3ef6e2de8" />
+<img width="1521" height="467" alt="image" src="https://github.com/user-attachments/assets/cdd2e7f5-c110-46a1-b2a2-dbaec046ca2a" />
 
 ## 🧠 策略逻辑流程图
 
