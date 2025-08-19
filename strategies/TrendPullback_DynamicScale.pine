@@ -1,11 +1,12 @@
 //@version=5
-strategy("波段回调交易系统", 
+strategy("波段交易系统（动态比例减仓版）", 
      overlay=true, 
      initial_capital=100000, 
      commission_type=strategy.commission.percent, 
      commission_value=0.05,
      default_qty_type=strategy.percent_of_equity,
-     pyramiding=1)
+     default_qty_value=50, // 设置默认仓位为50%
+     pyramiding=2) // 金字塔2笔
 
 // ===== 参数配置区 =====
 // 趋势判定参数
