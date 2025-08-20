@@ -50,9 +50,9 @@
 ## 🤝 如何参与改进
 
 如果你发现代码问题：
-1.Fork本项目
-2.创建新分支 (git checkout -b fix/信号逻辑)
-3.提交Pull Request
+1. Fork本项目
+2. 创建新分支 (git checkout -b fix/信号逻辑)
+3. 提交Pull Request
 
 ## 🛠 快速安装
 1. 复制`.pine`文件内容
