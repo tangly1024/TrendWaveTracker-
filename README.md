@@ -82,18 +82,91 @@
 
 ## 🧠 策略逻辑流程图
 
+### 策略一：均线突破交易系统
 ```mermaid
-graph TD
-
-A[趋势判断] -->|EMA25向上| B(等待回调)
-A -->|EMA交叉| C(突破信号)
-B --> D{回调至EMA10且<3%}
-C --> E{突破双均线}
-D & E --> F[建仓]
-F --> G[布林带上轨触发减仓]
-G --> H[冷却5根K线]
-H --> G
+flowchart TD
+    A[开始] --> B{趋势判断}
+    B -->|EMA10/SMA10| C[快线突破]
+    B -->|EMA20/SMA20| D[慢线突破]
+    C & D --> E{是否首次建仓?}
+    E -->|是| F[开仓50%仓位<br/>记录入场价]
+    E -->|否| G[检查冷却期]
+    
+    F --> H[绘制建仓标签]
+    G --> I{冷却期结束<br/>且触及布林带上轨?}
+    I -->|是| J[减仓30%<br/>重置冷却计时器]
+    I -->|否| K[保持仓位]
+    
+    J --> L[更新减仓计数器]
+    K --> M{收盘价下穿<br/>清仓均线?}
+    M -->|是| N[全仓平仓]
+    M -->|否| O[继续持仓]
+    
+    N --> P[绘制清仓标签]
+    O --> Q[更新状态面板]
+    P --> Q
+    Q --> R[结束]
+    
+    style C stroke:#3498db,stroke-width:2px
+    style D stroke:#e67e22,stroke-width:2px
+    style J stroke:#9b59b6,stroke-width:2px
+    style N stroke:#e74c3c,stroke-width:2px
 ```
+### 策略而：波段回调交易系统
+```mermaid
+flowchart TD
+    A[开始] --> B{EMA10>EMA25<br/>且斜率>0.01%?}
+    B -->|是| C{价格回调至<br/>EMA10的3%内?}
+    B -->|否| D[等待条件]
+    
+    C -->|是| E[开仓50%仓位<br/>启用金字塔加仓]
+    C -->|否| F[继续监测]
+    E --> G[绘制建仓标签]
+    
+    G --> H{触及布林带上轨<br/>且冷却期结束?}
+    H -->|是| I[减仓30%<br/>冷却5根K线]
+    H -->|否| J[保持仓位]
+    
+    I --> K[更新减仓次数]
+    J --> L{EMA10下穿EMA25<br/>且阴线收盘?}
+    L -->|是| M[全仓平仓]
+    L -->|否| N[继续持仓]
+    
+    M --> O[绘制清仓标签]
+    N --> P[更新状态面板]
+    O --> P
+    P --> Q[结束]
+    
+    style B stroke:#2ecc71,stroke-width:2px
+    style I stroke:#f39c12,stroke-width:2px
+    style M stroke:#c0392b,stroke-width:2px
+```
+
+### 策略对比
+
+```mermaid
+flowchart LR
+    subgraph 均线突破系统["均线突破系统"]
+        A1[双均线突破入场] --> B1[固定比例减仓]
+        B1 --> C1[收盘价清仓]
+    end
+    
+    subgraph 波段交易系统["波段交易系统"]
+        A2[趋势回调入场] --> B2[动态比例减仓]
+        B2 --> C2[均线交叉清仓]
+    end
+    
+    A1 -.->|共同特性| A2
+    B1 -.->|冷却期控制| B2
+    C1 -.->|可视化标签| C2
+    
+    style 均线突破系统 stroke:#1a5276,fill:#154360,color:white
+    style 波段交易系统 stroke:#186a3b,fill:#145a32,color:white
+
+    linkStyle 0,1,2 stroke:#f39c12,stroke-width:2px
+```
+
+
 ## 💡 使用建议
 - 组合使用两个策略可降低风险
 - 加密货币建议调高减仓比例至40%
