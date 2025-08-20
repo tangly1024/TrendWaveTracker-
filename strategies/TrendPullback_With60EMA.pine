@@ -1,0 +1,144 @@
+//@version=5
+strategy("波段交易系统（带60EMA过滤空头趋势）",
+     overlay=true,
+     initial_capital=100000,
+     commission_type=strategy.commission.percent,
+     commission_value=0.05,
+     default_qty_type=strategy.percent_of_equity,
+     default_qty_value=50, // 设置默认仓位为50%
+     pyramiding=2)// 金字塔两笔
+
+// ===== 参数配置区 =====
+// 趋势判定参数
+inputTrendLen = input.int(25, "趋势周期", minval=10, group="趋势判定")
+inputEntryMA = input.int(10, "回调均线", minval=5, group="趋势判定")
+inputMinSlope = input.float(0.01, "最小斜率%", minval=0.001, step=0.001, group="趋势判定")
+inputPullbackPct = input.float(3.0, "回调幅度%", minval=0.1, step=0.1, group="回调设置")
+
+// 止盈设置参数
+inputBollingerPeriod = input.int(10, "布林带周期", minval=5, group="止盈设置")
+inputBollingerMult = input.float(2.0, "布林带倍数", minval=1, step=0.1, group="止盈设置")
+inputExitRatio = input.float(30.0, "每次减仓比例%", minval=5, maxval=50, step=1, group="仓位分配")
+inputBollingerCooldown = input.int(5, "减仓冷却K线数", minval=1, group="频率控制")
+
+// 清仓条件参数
+inputRequireBearishClose = input.bool(true, "要求阴线收盘", group="清仓条件")
+
+// 仓位管理参数
+inputRiskPct = input.float(50.0, "单笔仓位%", minval=0.1, maxval=100, step=0.1, group="仓位管理")
+
+
+// ===== 指标计算区 =====
+// 均线系统
+emaTrend = ta.ema(close, inputTrendLen)
+emaLong = ta.ema(close, inputEntryMA)
+ema60 = ta.ema(close, 60) // 添加60日均线
+
+// 布林带计算
+bollBasis = ta.sma(close, inputBollingerPeriod)
+bollDev = inputBollingerMult * ta.stdev(close, inputBollingerPeriod)
+upperBand = bollBasis + bollDev
+
+
+// ===== 变量声明区 =====
+var float entryPrice = na
+var int lastBollingerExitBar = -999
+var int exitCount = 0
+var float currentPositionSize = na
+exitPct = inputExitRatio / 100  // 减仓比例
+
+
+// ===== 交易逻辑区 =====
+// 入场条件 - 添加60日均线判断
+enterLong = emaLong > emaTrend and
+           (emaLong - emaTrend) > (emaTrend * inputMinSlope/100) and
+           close <= emaLong * (1 + inputPullbackPct/100) and
+           close > ema60 // 添加60日均线条件
+
+// 布林带减仓条件
+canBollingerExit = strategy.position_size > 0 and
+                 bar_index > lastBollingerExitBar + inputBollingerCooldown and
+                 high >= upperBand
+
+// 趋势反转清仓条件
+exitCondition = ta.crossunder(emaLong, emaTrend) and
+               (inputRequireBearishClose ? close < open : true)
+
+
+// ===== 交易执行区 =====
+// 建仓逻辑
+if enterLong and strategy.position_size == 0
+    strategy.entry("Main", strategy.long)
+    entryPrice := close
+    lastBollingerExitBar := -999
+    exitCount := 0
+    currentPositionSize := strategy.position_size
+    label.new(bar_index, low, "建仓@" + str.tostring(close), color=color.green, style=label.style_label_up)
+
+// 更新当前持仓量
+if strategy.position_size > 0
+    currentPositionSize := strategy.position_size
+
+// 布林带减仓执行（每次减当前持仓的固定比例）
+if canBollingerExit
+    strategy.exit("BollExit", qty=currentPositionSize * exitPct, limit=close)
+    lastBollingerExitBar := bar_index
+    exitCount := exitCount + 1
+    currentPositionSize := strategy.position_size
+    label.new(bar_index, high,
+         text=str.tostring(exitCount) + "减仓" + str.tostring(inputExitRatio) + "%",
+         color=color.purple,
+         textcolor=color.white)
+
+// 趋势反转清仓执行
+if exitCondition and strategy.position_size > 0
+    strategy.close_all("TrendExit")
+    label.new(bar_index, high, "趋势清仓", color=color.red, style=label.style_label_down)
+
+
+// ===== 可视化区 =====
+// 指标绘制
+plot(emaTrend, "趋势线", color=color.blue, linewidth=2)
+plot(emaLong, "回调线", color=color.purple, linewidth=1)
+plot(upperBand, "布林带上轨", color=color.rgb(219, 0, 0), linewidth=1)
+plot(ema60, "60日均线", color=color.rgb(0, 0, 0, 30), linewidth=2) // 添加60日均线绘制
+
+// 冷却期标记
+plotshape(bar_index <= lastBollingerExitBar + inputBollingerCooldown and lastBollingerExitBar != -999,
+     style=shape.triangledown,
+     location=location.abovebar,
+     color=color.new(color.orange, 50),
+     size=size.small,
+     title="冷却期")
+
+// ===== 状态面板区 =====
+var table stats = table.new(position.top_right, 2, 7, border_width=1)
+if barstate.islast
+    // 减仓信息
+    table.cell(stats, 0, 0, "减仓比例%", bgcolor=color.gray)
+    table.cell(stats, 1, 0, str.tostring(inputExitRatio) + "%", bgcolor=color.purple)
+
+    table.cell(stats, 0, 1, "冷却进度", bgcolor=color.gray)
+    table.cell(stats, 1, 1,
+         lastBollingerExitBar != -999 ?
+             str.tostring(bar_index - lastBollingerExitBar) + "/" + str.tostring(inputBollingerCooldown) : "N/A",
+         bgcolor=bar_index <= lastBollingerExitBar + inputBollingerCooldown ? color.orange : color.green)
+
+    table.cell(stats, 0, 2, "已减仓次数", bgcolor=color.gray)
+    table.cell(stats, 1, 2, str.tostring(exitCount), bgcolor=color.fuchsia)
+
+    // 仓位信息
+    table.cell(stats, 0, 3, "当前仓位", bgcolor=color.gray)
+    table.cell(stats, 1, 3, strategy.position_size > 0 ? "持仓" : "空仓",
+              bgcolor=strategy.position_size > 0 ? color.green : color.red)
+
+    table.cell(stats, 0, 4, "持仓量", bgcolor=color.gray)
+    table.cell(stats, 1, 4, str.tostring(currentPositionSize, "#.##"), bgcolor=color.blue)
+
+    // 价格信息
+    table.cell(stats, 0, 5, "入场价格", bgcolor=color.gray)
+    table.cell(stats, 1, 5, str.tostring(entryPrice, "#.##"), bgcolor=color.yellow)
+
+    // 剩余比例
+    table.cell(stats, 0, 6, "剩余比例%", bgcolor=color.gray)
+    table.cell(stats, 1, 6,          strategy.position_size > 0 ? str.tostring((1 - exitPct) * exitCount * 100, "#.#") + "%" : "0%",        bgcolor=color.silver)
