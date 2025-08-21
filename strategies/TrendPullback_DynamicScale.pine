@@ -6,17 +6,17 @@ strategy("波段交易系统（动态比例减仓版）",
      commission_value=0.05,
      default_qty_type=strategy.percent_of_equity,
      default_qty_value=50, // 设置默认仓位为50%
-     pyramiding=2) // 金字塔2笔
+     pyramiding=2)// 金字塔两笔
 
 // ===== 参数配置区 =====
 // 趋势判定参数
 inputTrendLen = input.int(25, "趋势周期", minval=10, group="趋势判定")
 inputEntryMA = input.int(10, "回调均线", minval=5, group="趋势判定")
-inputMinSlope = input.float(0.01, "最小斜率%", minval=0.001, step=0.001, group="趋势判定")
+inputMinSlope = input.float(1.5, "最小斜率%", minval=0.1, step=0.1, group="趋势判定")
 inputPullbackPct = input.float(3.0, "回调幅度%", minval=0.1, step=0.1, group="回调设置")
 
 // 止盈设置参数
-inputBollingerPeriod = input.int(10, "布林带周期", minval=5, group="止盈设置")
+inputBollingerPeriod = input.int(8, "布林带周期", minval=5, group="止盈设置")
 inputBollingerMult = input.float(2.0, "布林带倍数", minval=1, step=0.1, group="止盈设置")
 inputExitRatio = input.float(30.0, "每次减仓比例%", minval=5, maxval=50, step=1, group="仓位分配")
 inputBollingerCooldown = input.int(5, "减仓冷却K线数", minval=1, group="频率控制")
@@ -32,6 +32,7 @@ inputRiskPct = input.float(50.0, "单笔仓位%", minval=0.1, maxval=100, step=0
 // 均线系统
 emaTrend = ta.ema(close, inputTrendLen)
 emaLong = ta.ema(close, inputEntryMA)
+ema60 = ta.ema(close, 60) // 添加60日均线
 
 // 布林带计算
 bollBasis = ta.sma(close, inputBollingerPeriod)
@@ -48,10 +49,11 @@ exitPct = inputExitRatio / 100  // 减仓比例
 
 
 // ===== 交易逻辑区 =====
-// 入场条件
+// 入场条件 - 添加60日均线判断
 enterLong = emaLong > emaTrend and 
            (emaLong - emaTrend) > (emaTrend * inputMinSlope/100) and
-           close <= emaLong * (1 + inputPullbackPct/100)
+           close <= emaLong * (1 + inputPullbackPct/100) and
+           close > ema60 // 添加60日均线条件
 
 // 布林带减仓条件
 canBollingerExit = strategy.position_size > 0 and 
@@ -98,7 +100,8 @@ if exitCondition and strategy.position_size > 0
 // 指标绘制
 plot(emaTrend, "趋势线", color=color.blue, linewidth=2)
 plot(emaLong, "回调线", color=color.purple, linewidth=1)
-plot(upperBand, "布林带上轨", color=color.teal, linewidth=1)
+plot(upperBand, "布林带上轨", color=color.rgb(219, 0, 0), linewidth=1)
+plot(ema60, "60日均线", color=color.rgb(0, 0, 0, 30), linewidth=2) // 添加60日均线绘制
 
 // 冷却期标记
 plotshape(bar_index <= lastBollingerExitBar + inputBollingerCooldown and lastBollingerExitBar != -999,
